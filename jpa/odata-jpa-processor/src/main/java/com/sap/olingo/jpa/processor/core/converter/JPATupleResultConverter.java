@@ -75,6 +75,17 @@ abstract class JPATupleResultConverter implements JPAResultConverter {
     buffer.deleteCharAt(0);
     return buffer.toString();
   }
+  
+  protected String buildConcatenatedKeyNew(final Tuple row, final List<JPAOnConditionItem> leftColumns) {
+	    final StringBuilder buffer = new StringBuilder();
+	    for (final JPAOnConditionItem item : leftColumns) {
+	      buffer.append(JPAPath.PATH_SEPARATOR);
+	      // TODO Tuple returns the converted value in case a @Convert(converter = annotation is given
+	      buffer.append(row.get(item.getLeftPath().getAlias()));
+	    }
+	    buffer.deleteCharAt(0);
+	    return buffer.toString();
+  }
 
   protected String buildPath(final String prefix, final JPAAssociationAttribute association) {
     return EMPTY_PREFIX.equals(prefix) ? association.getExternalName() : prefix + JPAPath.PATH_SEPARATOR + association
@@ -281,8 +292,14 @@ abstract class JPATupleResultConverter implements JPAResultConverter {
   Integer determineCount(final JPAAssociationPath association, final Tuple parentRow, final JPAExpandResult child)
       throws ODataJPAQueryException {
     try {
-      final Long count = child.getCount(buildConcatenatedKey(parentRow, association.getLeftColumnsList()));
-      return count != null ? count.intValue() : null;
+      //final Long count = child.getCount(buildConcatenatedKey(parentRow, association.getLeftColumnsList()));
+    	Long count = null;
+        if(association.getLeftColumnsList().isEmpty()){
+          count = child.getCount(buildConcatenatedKeyNew(parentRow, association.getJoinColumnsList()));
+        } else{
+          count = child.getCount(buildConcatenatedKey(parentRow, association.getLeftColumnsList()));
+        }
+    	return count != null ? count.intValue() : null;
     } catch (final ODataJPAModelException e) {
       throw new ODataJPAQueryException(ODataJPAQueryException.MessageKeys.QUERY_RESULT_CONV_ERROR,
           HttpStatusCode.INTERNAL_SERVER_ERROR, e);
@@ -305,9 +322,16 @@ abstract class JPATupleResultConverter implements JPAResultConverter {
     link.setRel(Constants.NS_NAVIGATION_LINK_REL + link.getTitle());
     link.setType(Constants.ENTITY_NAVIGATION_LINK_TYPE);
     try {
-      final EntityCollection expandCollection = ((JPAConvertibleResult) child).getEntityCollection(
-          buildConcatenatedKey(parentRow, association.getLeftColumnsList()));
-
+      //final EntityCollection expandCollection = ((JPAConvertibleResult) child).getEntityCollection(
+          //buildConcatenatedKey(parentRow, association.getLeftColumnsList()));
+    	EntityCollection expandCollection = null;
+        if(association.getLeftColumnsList().isEmpty()){
+          expandCollection = ((JPAConvertibleResult) child).getEntityCollection(
+                  buildConcatenatedKeyNew(parentRow, association.getJoinColumnsList()));
+        } else{
+          expandCollection = ((JPAConvertibleResult) child).getEntityCollection(
+                  buildConcatenatedKey(parentRow, association.getLeftColumnsList()));
+        }
       expandCollection.setCount(determineCount(association, parentRow, child));
       if (association.getLeaf().isCollection()) {
         link.setInlineEntitySet(expandCollection);
